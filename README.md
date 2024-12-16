@@ -2,7 +2,8 @@ All of my attempts to create prime visualizations in one place
 
 
 
-<img width="814" alt="image" src="https://github.com/user-attachments/assets/f62114d8-05ef-40d3-b9bd-a5c45ef9d51d" />
+<img width="1192" alt="image" src="https://github.com/user-attachments/assets/f8a745ab-66a4-4b5e-8df1-7f4bf09f2297" />
+
 
 ![image](https://github.com/user-attachments/assets/390a1bb9-78f0-478f-92ce-c0ee41127226)
 
