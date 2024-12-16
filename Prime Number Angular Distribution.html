@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Unwrapped Prime Circles Visualization</title>
+    <style>
+        :root {
+            --primary-color: #4CAF50;
+            --primary-hover: #45a049;
+            --danger-color: #f44336;
+            --danger-hover: #d32f2f;
+            --disabled-color: #666666;
+            --background-color: #121212;
+            --card-background: #1e1e1e;
+            --text-color: #ffffff;
+            --shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: var(--background-color);
+            margin: 0;
+            padding: 20px;
+            color: var(--text-color);
+        }
+
+        .controls {
+            margin: 20px;
+            padding: 20px;
+            background: var(--card-background);
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        canvas {
+            background: black;
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+        }
+
+        button {
+            padding: 8px 16px;
+            color: var(--text-color);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-weight: 500;
+        }
+
+        button.primary {
+            background: var(--primary-color);
+        }
+
+        button.primary:hover:not(:disabled) {
+            background: var(--primary-hover);
+        }
+
+        button.danger {
+            background: var(--danger-color);
+        }
+
+        button.danger:hover:not(:disabled) {
+            background: var(--danger-hover);
+        }
+
+        #currentLayer {
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <div class="control-group">
+            <button id="animateBtn" class="primary">Start Animation</button>
+            <button id="resetBtn" class="danger">Reset</button>
+        </div>
+        <div class="control-group">
+            Primes: <span id="currentLayer">1</span>
+        </div>
+    </div>
+    <canvas id="lineCanvas" width="1200" height="600"></canvas>
+
+    <script>
+        const TAU = 2 * Math.PI;
+
+        class PrimeGenerator {
+            constructor() {
+                this.primes = [2];
+                this.lastChecked = 2;
+            }
+
+            generateUpTo(n) {
+                while (this.primes.length < n) {
+                    this.lastChecked++;
+                    if (this.isPrime(this.lastChecked)) {
+                        this.primes.push(this.lastChecked);
+                    }
+                }
+                return this.primes.slice(0, n);
+            }
+
+            isPrime(num) {
+                const sqrt = Math.sqrt(num);
+                for (const prime of this.primes) {
+                    if (prime > sqrt) break;
+                    if (num % prime === 0) return false;
+                }
+                return true;
+            }
+        }
+
+        class UnwrappedVisualizer {
+            constructor(canvasId) {
+                this.canvas = document.getElementById(canvasId);
+                this.ctx = this.canvas.getContext('2d');
+                this.isAnimating = false;
+                this.animationId = null;
+                this.currentLayer = 1;
+                this.primeGenerator = new PrimeGenerator();
+                this.layers = [];
+                this.setupCanvas();
+            }
+
+            setupCanvas() {
+                this.dpr = window.devicePixelRatio || 1;
+                this.canvas.width = 1200 * this.dpr;
+                this.canvas.height = 600 * this.dpr;
+                this.canvas.style.width = '1200px';
+                this.canvas.style.height = '600px';
+                this.ctx.scale(this.dpr, this.dpr);
+            }
+
+            reset() {
+                this.stopAnimation();
+                this.currentLayer = 1;
+                this.layers = [];
+                this.primeGenerator = new PrimeGenerator();
+                this.addLayer();
+            }
+
+            addLayer() {
+                const primes = this.primeGenerator.generateUpTo(this.currentLayer);
+                const prime = primes[this.currentLayer - 1];
+                const angles = Array.from({length: prime}, (_, i) => (i * TAU) / prime);
+                this.layers.push({prime, angles});
+                this.redrawAllLayers();
+            }
+
+            redrawAllLayers() {
+                if (this.layers.length === 0) return;
+
+                // Clear canvas
+                this.ctx.fillStyle = 'black';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+                // Calculate the vertical scale based on the largest prime
+                const maxPrime = Math.max(...this.layers.map(l => l.prime));
+                const verticalScale = (this.canvas.height / this.dpr) / (maxPrime * 1.5);
+                
+                // Calculate horizontal scale for 2π
+                const horizontalScale = (this.canvas.width / this.dpr) / TAU;
+
+                // Draw baseline grid
+                this.drawGrid(horizontalScale, verticalScale);
+
+                // Draw all layers
+                this.layers.forEach((layer, layerIndex) => {
+                    const radius = layer.prime;
+                    
+                    // Draw horizontal line representing the radius
+                    this.ctx.beginPath();
+                    this.ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+                    const y = this.canvas.height/this.dpr - radius * verticalScale;
+                    this.ctx.moveTo(0, y);
+                    this.ctx.lineTo(this.canvas.width/this.dpr, y);
+                    this.ctx.stroke();
+
+                    // Draw points for this layer
+                    layer.angles.forEach(angle => {
+                        const x = angle * horizontalScale;
+                        this.ctx.beginPath();
+                        this.ctx.arc(x, y, 2, 0, TAU);
+                        this.ctx.fillStyle = 'rgba(255,255,255,0.5)';
+                        this.ctx.fill();
+                    });
+                });
+
+                document.getElementById('currentLayer').textContent = this.currentLayer;
+            }
+
+            drawGrid(horizontalScale, verticalScale) {
+                // Draw vertical grid lines (for π/2 intervals)
+                this.ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+                this.ctx.setLineDash([5, 5]);
+                
+                for (let angle = 0; angle <= TAU; angle += Math.PI/2) {
+                    const x = angle * horizontalScale;
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(x, 0);
+                    this.ctx.lineTo(x, this.canvas.height/this.dpr);
+                    this.ctx.stroke();
+                }
+
+                this.ctx.setLineDash([]);
+            }
+
+            startAnimation() {
+                this.isAnimating = true;
+                animateBtn.textContent = 'Stop Animation';
+                this.animate();
+            }
+
+            stopAnimation() {
+                this.isAnimating = false;
+                animateBtn.textContent = 'Start Animation';
+                if (this.animationId) {
+                    cancelAnimationFrame(this.animationId);
+                }
+            }
+
+            animate() {
+                if (!this.isAnimating) return;
+                
+                this.currentLayer++;
+                this.addLayer();
+                
+                this.animationId = requestAnimationFrame(() => {
+                    setTimeout(() => this.animate(), 100);
+                });
+            }
+        }
+
+        const animateBtn = document.getElementById('animateBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const visualizer = new UnwrappedVisualizer('lineCanvas');
+
+        animateBtn.addEventListener('click', () => {
+            if (visualizer.isAnimating) {
+                visualizer.stopAnimation();
+            } else {
+                visualizer.startAnimation();
+            }
+        });
+
+        resetBtn.addEventListener('click', () => {
+            visualizer.reset();
+        });
+
+        // Initial layer
+        visualizer.addLayer();
+    </script>
+</body>
+</html>
